@@ -1,0 +1,94 @@
+#include <LiquidCrystal.h>
+
+// LCD pins: RS, E, D4, D5, D6, D7
+LiquidCrystal lcd(12, 11, 5, 4, 3, 2);
+
+// === Sensor Pins ===
+const int soilPin    = A0;  // Soil moisture sensor (analog)
+const int tempPin    = A1;  // TMP36 temperature sensor (analog)
+const int gasPin     = A2;  // Gas/Smoke sensor (analog)
+
+// === Output Pins ===
+const int motorPin   = 8;   // Water pump motor control (digital)
+const int buzzerPin  = 6;   // Piezo buzzer (digital)
+const int redLEDPin  = 7;   // Gas alert indicator - RED LED
+const int greenLEDPin= 9;   // Gas alert indicator - GREEN LED
+const int blueLEDPin = 10;  // Gas alert indicator - BLUE LED (optional)
+
+// === Thresholds ===
+const int gasThreshold = 86; // Gas density safe limit
+
+void setup() {
+  // Initialize outputs
+  pinMode(motorPin, OUTPUT);
+  digitalWrite(motorPin, LOW);
+
+  pinMode(buzzerPin, OUTPUT);
+  digitalWrite(buzzerPin, LOW);
+
+  pinMode(redLEDPin, OUTPUT);
+  pinMode(greenLEDPin, OUTPUT);
+  pinMode(blueLEDPin, OUTPUT);
+
+  // Gas sensor input
+  pinMode(gasPin, INPUT);
+
+  // Initialize Serial for gas sensor readings
+  Serial.begin(9600);
+
+  // Initialize LCD for soil & temperature
+  lcd.begin(16, 2);
+  lcd.clear();
+  lcd.print("System Starting");
+  delay(2000);
+  lcd.clear();
+}
+
+void loop() {
+  // --- Soil Moisture & Temperature ---
+  int soilValue = analogRead(soilPin);
+  int rawTemp   = analogRead(tempPin);
+  float voltage = rawTemp * (5.0 / 1023.0);
+  float tempC   = (voltage - 0.5) * 100.0;
+
+  // Display on LCD
+  lcd.setCursor(0, 0);
+  lcd.print("Soil:");
+  lcd.print(soilValue);
+  lcd.print("    ");  // clear remainder
+
+  lcd.setCursor(0, 1);
+  lcd.print("Temp:");
+  lcd.print(tempC, 1);
+  lcd.print("C   ");
+
+  // Motor control based on soil & temp
+  if (tempC > 40.0 && soilValue < 100) {
+    digitalWrite(motorPin, HIGH);
+  } else if (soilValue < 50) {
+    digitalWrite(motorPin, HIGH);
+  } else {
+    digitalWrite(motorPin, LOW);
+  }
+
+  // --- Gas Sensor & Buzzer ---
+  int gasValue = analogRead(gasPin);
+  Serial.print("Gas Density: ");
+  Serial.println(gasValue);
+
+  if (gasValue > gasThreshold) {
+    // Danger: activate alert continuously
+    digitalWrite(redLEDPin, HIGH);
+    digitalWrite(greenLEDPin, LOW);
+    digitalWrite(blueLEDPin, LOW);
+    tone(buzzerPin, 500);       // Continuous tone at 500 Hz
+  } else {
+    // Safe: green LED only
+    digitalWrite(greenLEDPin, HIGH);
+    digitalWrite(redLEDPin, LOW);
+    digitalWrite(blueLEDPin, LOW);
+    noTone(buzzerPin);
+  }
+
+  delay(1000);
+}
